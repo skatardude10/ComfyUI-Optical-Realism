@@ -2,6 +2,8 @@
 
 **Trying to Kill the "Uncanny Valley" of uniform entropy?**
 
+Applies a combination of chromatic aberration, depth aware grain and background desaturation, curves to the black/white floor/ceiling, vignette and screen effects.
+
 This node is an attempt at physics-based post-processing that uses a Depth Map to simulate **Atmospheric Perspective**, **Light Transport**, and **Physical Lens Imperfections**. It trys to turns a "generation" into a "photograph."
 
 ## The Problem
