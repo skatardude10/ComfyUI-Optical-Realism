@@ -55,7 +55,7 @@ Here is exactly what the sliders do.
 
 ## Comparison
 
-
+I am too lazy to get side by side for all of the subtle things this does. I tried to pick sane defaults that make a solid improvement. Play with the sliders... again, or don't! I tried it with the standard plastic skin AI generated images and I will be using this so I share... it takes depth into account to focus on the subject so it's whatever.
 
 ## Troubleshooting
 
