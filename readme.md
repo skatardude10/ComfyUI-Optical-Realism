@@ -1,6 +1,6 @@
 # ComfyUI-Optical-Realism
 
-**Trying to Kill the "Uncanny Valley" of uniform entropy?*
+**Trying to Kill the "Uncanny Valley" of uniform entropy?**
 
 This node is an attempt at physics-based post-processing that uses a Depth Map to simulate **Atmospheric Perspective**, **Light Transport**, and **Physical Lens Imperfections**. It trys to turns a "generation" into a "photograph."
 
