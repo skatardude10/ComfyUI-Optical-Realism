@@ -4,6 +4,8 @@
 
 This custom node for [ComfyUI](https://github.com/comfyanonymous/ComfyUI) takes a standard RGB image and a **Depth Map**, acting as a virtual camera to simulate physical lens geometry, depth-of-field, light scattering, and film emulsion.
 
+---
+
 ## The Problem vs. The Solution
 
 | The "Typical AI image" | Real-World Photography |
@@ -21,7 +23,7 @@ This node addresses all of these physics-based phenomena in a single pass.
 
 ## 📷 Before & After
 
-*(Left: Raw AI Generation | Right: Optical Realism Processing)*  S
+*(Left: Raw AI Generation | Right: Optical Realism Processing)* 
 | Before | After |
 | :---: | :---: |
 | <img src="examples/before.png" width="100%"> | <img src="examples/after.png" width="100%"> |
@@ -54,15 +56,15 @@ This node addresses all of these physics-based phenomena in a single pass.
 
 *(Note: The script assumes Black = Near, White = Far. If your depth model outputs the opposite, use an Invert Image node in between).*
 
+| Defaults should be sensible for well lit scenes: | Core Nodes to function, or provide your own depth map and just use the one node: |
+| :---: | :---: |
+| <img src="examples/Core-Node.png" width="400"> | <img src="examples/Core-Nodes.png" width="100%"> |
 
-*Node defaults should be sensible for well lit scenes:*
+Optional upscalers like **SeedVR2** pair incredibly well with this pipeline to clean up details before optical processing, this is included in the Example Workflow image above. with a blank white mask for the optional upscaling input.
 
-<img src="examples/Core-Node.png" width="400">
-<img src="examples/Core-Nodes.png" width="100%">
-
-Optional upscalers like **SeedVR2** pair incredibly well with this pipeline to clean up details before optical processing, this is included in the Example Workflow image above, with a blank white mask to use here if you decide to use this.
-<img src="whitemask.png" width="400">
-<img src="examples/Upscaling-Nodes.png" width="100%">
+| Upscaling | Mask |
+| :---: | :---: |
+| <img src="examples/Upscaling-Nodes.png" width="100%"> | <img src="whitemask.png" width="400"> |
 
 ---
 
