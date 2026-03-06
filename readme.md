@@ -1,14 +1,12 @@
 # ComfyUI-Optical-Realism
 
-**Subtle or Not attempt to bridge easily between AI generation and physical photography.**
-
-AI images tend to have uniform frequency distribution—where noise, texture, and light are mathematically perfect across the entire frame. This node tries to capture more real photo feel, simulate physical lenses, atmospheric density, and film chemistry to introduce beautiful optical imperfections.
+**Attempt to bridge from AI generation closer to physical photography.**
 
 This custom node for [ComfyUI](https://github.com/comfyanonymous/ComfyUI) takes a standard RGB image and a **Depth Map**, acting as a virtual camera to simulate physical lens geometry, depth-of-field, light scattering, and film emulsion.
 
 ## The Problem vs. The Solution
 
-| The "AI Look" | Real-World Photography |
+| The "Typical AI image" | Real-World Photography |
 | :--- | :--- |
 | Perfectly sharp everywhere | **Depth of Field (Bokeh)** isolates the subject |
 | Hard edges on backlit subjects | Bright light bleeds around edges (**Light Wrap** & **Halation**) |
@@ -22,7 +20,6 @@ This node addresses all of these physics-based phenomena in a single pass.
 ---
 
 ## 📷 Before & After
-I like it subtle. You decide:
 
 *(Left: Raw AI Generation | Right: Optical Realism Processing)*  S
 | Before | After |
@@ -46,13 +43,19 @@ I like it subtle. You decide:
    ```
 2. Restart ComfyUI.
 
+---
+
 ### The Workflow 
 **Crucial:** This node requires a **Depth Map** to calculate 3D space. We highly recommend using **Depth Anything V2** (specifically the `vit_l` model) for the most accurate edge detection. Example workflow includes other custom nodes you can choose to use or replace as you see fit.
 
 **Basic Routing:**
 1. **Input Image** → `Remove Alpha (included utility)` → `Optical Realism` (Image Input)
 2. **Input Image** → `Depth Anything V2` → `Optical Realism` (Depth Input)
+
 *(Note: The script assumes Black = Near, White = Far. If your depth model outputs the opposite, use an Invert Image node in between).*
+
+
+*Node defaults should be sensible for well lit scenes:*
 
 <img src="examples/Core-Node.png" width="400">
 <img src="examples/Core-Nodes.png" width="100%">
@@ -65,7 +68,7 @@ Optional upscalers like **SeedVR2** pair incredibly well with this pipeline to c
 
 ## 🎛️ The Settings Explained
 
-Here is a breakdown of what each parameter does under the hood.
+Here is a breakdown of what each parameter does under the hood. Stronger values for clarity:
 
 ### 📐 Camera & Lens Geometry
 * **Lens Distortion:** Mimics physical lens curvature. Positive values (`0.05`) add barrel distortion (wide-angle bulge), while negative values add pincushioning. The script safely reflects the edges so you never get black borders.
