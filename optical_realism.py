@@ -28,6 +28,7 @@ class OpticalRealism:
                 "depth_offset": ("FLOAT", {"default": 0.00, "min": -1.0, "max": 1.0, "step": 0.05}),
                 
                 # --- DEPTH OF FIELD (BOKEH) ---
+                "f_stop": (["Manual", "f/1.2", "f/1.4", "f/1.8", "f/2.0", "f/2.8", "f/4.0", "f/5.6", "f/8.0", "f/11", "f/16", "f/22"], {"default": "Manual"}),
                 "dof_intensity": ("FLOAT", {"default": 0.30, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "dof_auto_focus": ("BOOLEAN", {"default": True}),
                 "dof_sharpness_radius": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -54,7 +55,7 @@ class OpticalRealism:
     def process_image(self, image, depth_map, 
                       lens_distortion, color_temperature, tint,
                       atmosphere_enabled, haze_strength, lift_blacks, depth_offset, 
-                      dof_intensity, dof_auto_focus, dof_sharpness_radius, dof_focus_point,
+                      f_stop, dof_intensity, dof_auto_focus, dof_sharpness_radius, dof_focus_point,
                       light_wrap_strength, promist_strength, halation_strength, 
                       chromatic_aberration, vignette_intensity, 
                       grain_power, monochrome_grain, highlight_rolloff):
@@ -119,6 +120,24 @@ class OpticalRealism:
             final_image = torch.clamp(final_image * gains, 0.0, 1.0)
 
         # --- 4. DEPTH OF FIELD (Circular Bokeh Blur) ---
+        # F-Stop Math Override
+        if f_stop != "Manual":
+            f_stop_map = {
+                "f/1.2": {"intensity": 0.80, "radius": 0.05},
+                "f/1.4": {"intensity": 0.60, "radius": 0.10},
+                "f/1.8": {"intensity": 0.45, "radius": 0.15},
+                "f/2.0": {"intensity": 0.40, "radius": 0.20},
+                "f/2.8": {"intensity": 0.30, "radius": 0.30},
+                "f/4.0": {"intensity": 0.20, "radius": 0.45},
+                "f/5.6": {"intensity": 0.10, "radius": 0.60},
+                "f/8.0": {"intensity": 0.05, "radius": 0.75},
+                "f/11":  {"intensity": 0.02, "radius": 0.85},
+                "f/16":  {"intensity": 0.00, "radius": 1.00},
+                "f/22":  {"intensity": 0.00, "radius": 1.00},
+            }
+            dof_intensity = f_stop_map[f_stop]["intensity"]
+            dof_sharpness_radius = f_stop_map[f_stop]["radius"]
+
         if dof_intensity > 0:
             if dof_auto_focus:
                 # ROI: Center 60% of the frame
@@ -141,11 +160,10 @@ class OpticalRealism:
             mask_k = (x_k**2 + y_k**2 <= radius**2).float().to(device)
             kernel = mask_k / mask_k.sum() # Normalize 
             
-            # Reshape for grouped Convolution: (out_channels, in_channels/groups, kH, kW)
+            # Reshape for grouped Convolution
             kernel = kernel.view(1, 1, kernel_size, kernel_size).repeat(3, 1, 1, 1)
             
             img_permuted = final_image.permute(0, 3, 1, 2)
-            # Apply blur per-channel (groups=3)
             blurred_img = F.conv2d(img_permuted, kernel, padding=radius, groups=3)
             blurred_img = blurred_img.permute(0, 2, 3, 1)
             
@@ -179,15 +197,12 @@ class OpticalRealism:
             img_permuted = final_image.permute(0, 3, 1, 2)
             luma = 0.299 * img_permuted[:, 0:1] + 0.587 * img_permuted[:, 1:2] + 0.114 * img_permuted[:, 2:3]
             
-            # Isolate mid-high luminance
             high_mask = torch.clamp((luma - 0.4) * 2.0, 0.0, 1.0)
             promist_source = img_permuted * high_mask
             
-            # Massive, soft global blur
             pm_bloom = TF.gaussian_blur(promist_source, kernel_size=43, sigma=15.0)
             pm_bloom = pm_bloom.permute(0, 2, 3, 1)
             
-            # Additive mix to lower micro-contrast
             final_image = final_image + (pm_bloom * promist_strength)
             final_image = torch.clamp(final_image, 0.0, 1.0)
 
@@ -196,15 +211,12 @@ class OpticalRealism:
             img_permuted = final_image.permute(0, 3, 1, 2)
             luma = 0.299 * img_permuted[:, 0:1] + 0.587 * img_permuted[:, 1:2] + 0.114 * img_permuted[:, 2:3]
             
-            # Isolate extreme highlights (strict threshold)
             hal_mask = torch.clamp((luma - 0.6) * 2.5, 0.0, 1.0)
             hal_source = img_permuted * hal_mask
             
-            # Spread highlight scatter
             hal_blur = TF.gaussian_blur(hal_source, kernel_size=31, sigma=8.0)
             hal_blur = hal_blur.permute(0, 2, 3, 1)
             
-            # Extract Red Channel scatter and add back safely
             red_halation = hal_blur[..., 0:1] * halation_strength
             r = final_image[..., 0:1] + red_halation
             gb = final_image[..., 1:3]
@@ -242,23 +254,41 @@ class OpticalRealism:
             vignette_mask = vignette_mask.unsqueeze(0).unsqueeze(-1)
             final_image = final_image * vignette_mask
 
-        # --- 11. ADAPTIVE GRAIN ---
+        # --- 11. PHYSICALLY ACCURATE FILM GRAIN (Emulsion Curve & Clump Based) ---
         if grain_power > 0:
+            # Step 1: Base Gaussian Noise
+            raw_noise = torch.randn_like(final_image)
+            
+            # Step 2: "Clump" the noise to simulate organic crystals
+            # A tiny blur correlates neighboring pixels, killing the sharp TV-static grid look
+            raw_noise_permuted = raw_noise.permute(0, 3, 1, 2)
+            clumped_noise = TF.gaussian_blur(raw_noise_permuted, kernel_size=3, sigma=0.8)
+            
+            # Blurring reduces math variance, so we multiply by 1.5 to restore the "punch"
+            clumped_noise = clumped_noise.permute(0, 2, 3, 1) * 1.5 
+            
+            # Step 3: Handle Monochrome vs Digital Color Noise
             if monochrome_grain:
-                noise_gray = torch.randn((b, h, w, 1), device=device) * grain_power
-                noise = noise_gray.repeat(1, 1, 1, 3) * 1.2 
+                # Average RGB channels into pure grayscale
+                mono = clumped_noise.mean(dim=-1, keepdim=True)
+                clumped_noise = mono.repeat(1, 1, 1, 3)
             else:
-                noise = torch.randn_like(final_image) * grain_power
+                # Digital sensor noise is NOT pure rainbow confetti. 
+                # It is mostly luminance noise with some color splotching.
+                mono = clumped_noise.mean(dim=-1, keepdim=True)
+                clumped_noise = torch.lerp(mono, clumped_noise, 0.4) # Mix 60% luma, 40% chroma
             
-            luminance = 0.299 * final_image[..., 0] + 0.587 * final_image[..., 1] + 0.114 * final_image[..., 2]
-            luminance = luminance.unsqueeze(-1)
-            luma_mask = 1.0 - torch.abs(luminance * 2.0 - 1.0)
+            # Step 4: Photographic Emulsion Blending (The Magic Formula)
+            # Math: image * (1 - image) * 4.0 
+            # This creates a perfect parabola per-pixel, per-channel.
+            # Pure black (0.0) -> 0% grain. Pure white (1.0) -> 0% grain. Mid-grey (0.5) -> 100% grain.
+            emulsion_curve = final_image * (1.0 - final_image) * 4.0
             
-            # Aggressive Depth Falloff
-            depth_grain_mask = 1.0 - (depth_mask * 0.85)
-            depth_grain_mask = torch.clamp(depth_grain_mask, 0.0, 1.0)
+            # Add a tiny 10% baseline so extreme shadows aren't mathematically sterile
+            emulsion_curve = torch.clamp(emulsion_curve + 0.01, 0.0, 1.0)
             
-            final_image = final_image + (noise * luma_mask * depth_grain_mask)
+            # Apply the emulsion
+            final_image = final_image + (clumped_noise * grain_power * emulsion_curve)
 
         # --- 12. HIGHLIGHT ROLL-OFF ---
         if highlight_rolloff > 0:
