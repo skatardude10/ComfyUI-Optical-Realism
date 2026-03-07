@@ -1,3 +1,5 @@
+*Update 6 March 2026 New functions added. This causes other values to go out-of-whack ... reload node to get back to defaults highly suggested.*
+
 # ComfyUI-Optical-Realism
 
 **A post-processing node to bring AI generations closer to physical photography.**
