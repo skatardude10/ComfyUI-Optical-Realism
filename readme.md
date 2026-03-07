@@ -1,23 +1,23 @@
 # ComfyUI-Optical-Realism
 
-**Attempt to bridge from AI generation closer to physical photography.**
+**A post-processing node to bring AI generations closer to physical photography.**
 
-This custom node for [ComfyUI](https://github.com/comfyanonymous/ComfyUI) takes a standard RGB image and a **Depth Map**, acting as a virtual camera to simulate physical lens geometry, depth-of-field, light scattering, and film emulsion.
+This custom node for [ComfyUI](https://github.com/comfyanonymous/ComfyUI) takes a standard RGB image and a **Depth Map**, acting as a virtual camera to apply physics-based post-processing like lens geometry, depth-of-field, light scattering, and film emulsion.
 
 ---
 
 ## The Problem vs. The Solution
 
-| The "Typical AI image" | Real-World Photography |
+| The "Typical AI Image" | Real-World Photography |
 | :--- | :--- |
 | Perfectly sharp everywhere | **Depth of Field (Bokeh)** isolates the subject |
 | Hard edges on backlit subjects | Bright light bleeds around edges (**Light Wrap** & **Halation**) |
 | Uniform black shadows | Distant shadows are lifted and hazy (**Atmospherics**) |
 | Mathematically straight lines | Glass lenses slightly curve light (**Lens Distortion**) |
 | Perfect white light | Real film leans warm/cool (**Temp/Tint**) |
-| Noise floating *over* the image | Film grain is sharp in-focus, but soft in the blur |
+| Digital noise floating uniformly over the image | Film grain reacts to light exposure (peaks in mid-tones, fades in highlights/shadows) |
 
-This node addresses all of these physics-based phenomena in a single pass. 
+This node addresses these optical and chemical phenomena in a single pass. 
 
 ---
 
@@ -31,7 +31,7 @@ This node addresses all of these physics-based phenomena in a single pass.
 
 ---
 
-# Example Workflow in Image:
+# Example Workflow
 <img src="Example-Workflow.png" width="100%">
 
 ---
@@ -48,7 +48,7 @@ This node addresses all of these physics-based phenomena in a single pass.
 ---
 
 ### The Workflow 
-**Crucial:** This node requires a **Depth Map** to calculate 3D space. We highly recommend using **Depth Anything V2** (specifically the `vit_l` model) for the most accurate edge detection. Example workflow includes other custom nodes you can choose to use or replace as you see fit.
+**Crucial:** This node requires a **Depth Map** to calculate 3D space. Depth Anything V2 (specifically the `vit_l` model) is highly recommended for accurate edge detection. The example workflow includes other custom nodes you can choose to use or replace as you see fit.
 
 **Basic Routing:**
 1. **Input Image** → `Remove Alpha (included utility)` → `Optical Realism` (Image Input)
@@ -56,11 +56,11 @@ This node addresses all of these physics-based phenomena in a single pass.
 
 *(Note: The script assumes Black = Near, White = Far. If your depth model outputs the opposite, use an Invert Image node in between).*
 
-| Defaults should be sensible for well lit scenes: | Core Nodes to function, or provide your own depth map and just use the one node: |
+| Defaults should be sensible for well-lit scenes: | Core Nodes to function (or provide your own depth map and just use the main node): |
 | :---: | :---: |
 | <img src="examples/Core-Node.png" width="400"> | <img src="examples/Core-Nodes.png" width="100%"> |
 
-Optional upscalers like **SeedVR2** pair incredibly well with this pipeline to clean up details before optical processing, this is included in the Example Workflow image above. with a blank white mask for the optional upscaling input.
+Optional upscalers like **SeedVR2** pair incredibly well with this pipeline to clean up details before optical processing (this is included in the Example Workflow image above with a blank white mask for the upscaling input).
 
 | Upscaling | Mask |
 | :---: | :---: |
@@ -70,40 +70,44 @@ Optional upscalers like **SeedVR2** pair incredibly well with this pipeline to c
 
 ## 🎛️ The Settings Explained
 
-Here is a breakdown of what each parameter does under the hood. Stronger values for clarity:
+Here is a breakdown of what each parameter does under the hood. *(Note: Some example images use exaggerated values for clarity).*
 
 ### 📐 Camera & Lens Geometry
-* **Lens Distortion:** Mimics physical lens curvature. Positive values (`0.05`) add barrel distortion (wide-angle bulge), while negative values add pincushioning. The script safely reflects the edges so you never get black borders.
+* **Lens Distortion:** Mimics physical lens curvature. Positive values (`0.05`) add barrel distortion (wide-angle bulge), while negative values add pincushioning. The script safely reflects the edges to prevent black borders.
   * <img src="examples/lens-distortion.png" width="100%">
-* **Color Temperature & Tint:** Shifts the white balance while mathematically preserving overall luminance so highlights never blow out. 
-  * *Tip: For a classic cinematic "Kodak" look that breathes life into skin tones, try `Temp: 0.10` and `Tint: -0.05`.*
+* **Color Temperature & Tint:** Shifts the white balance while mathematically preserving overall luminance so highlights don't blow out. 
+  * *Tip: For a classic cinematic "Kodak" look that flatters skin tones, try `Temp: 0.10` and `Tint: -0.05`.*
 
 ### 💨 Atmospherics
-* **Atmosphere Enabled:** The master switch for depth-based physics.
+* **Atmosphere Enabled:** The master switch for depth-based haze and lift.
 * **Haze Strength:** How "thick" is the air? High values push the background into a humid fog.
-* **Lift Blacks:** **The secret sauce.** Real shadows in the distance aren't pure black (`#000000`); they are dark atmospheric grey-blue. This lifts background shadows to physically separate the subject from the environment.
+* **Lift Blacks:** Real shadows in the distance aren't pure black (`#000000`); they are dark atmospheric grey-blue. This lifts background shadows to physically separate the subject from the environment without ruining foreground contrast.
 * **Depth Offset:** Pushes the "fog curtain" forward or backward.
 
 ### 🔍 Depth of Field (Bokeh)
-* **DoF Intensity:** Controls the size of the blur. *Note: This uses a custom Circular Disc Convolution, meaning out-of-focus background points will turn into beautiful, realistic circles (Bokeh) rather than muddy Gaussian smudges.*
+* **F-Stop:** (TESTING) Emulates real-world lens apertures. **Selecting an f-stop automatically overrides the manual `DoF Intensity` and `DoF Sharpness Radius` sliders.** 
+  * Lower f-stops (e.g., `f/1.4`) create heavy background blur and a razor-thin focus area.
+  * Higher f-stops (e.g., `f/11`) apply very mild blur and keep a wide depth of the scene perfectly in focus.
+  * Leave on `Manual` to use the sliders below.
+* **DoF Intensity:** Controls the size of the blur manually. *Note: This uses a custom Circular Disc Convolution, meaning out-of-focus background points will turn into realistic optical circles (Bokeh) rather than muddy Gaussian smudges.*
 * **DoF Auto Focus:** When enabled, the node analyzes the center 60% of the depth map and automatically locks focus onto your main subject based on depth percentiles.
-* **DoF Sharpness Radius:** The "safe zone" around the focal point. Higher values (`0.35`) keep more of the subject crisp before the blur gently ramps up.
+* **DoF Sharpness Radius:** The "safe zone" or deadzone around the focal point. Higher values (`0.35`) keep more of the subject crisp before the blur gently ramps up.
 
 ### 🌟 Optical Phenomena
-* **Light Wrap Strength:** Takes bright background light and physically bleeds it over the edges of the foreground subject. Kills the "cutout sticker" look.
+* **Light Wrap Strength:** Takes bright background light and physically bleeds it over the edges of the foreground subject. Kills the "cutout sticker" look on backlit subjects.
 * **Pro-Mist Strength:** Simulates a physical glass diffusion filter (like a Tiffen Black Pro-Mist). It isolates high-luminance pixels and creates a gentle, warm bloom, taking the "digital edge" off sharp lines.
   * | Without Pro-Mist | With Pro-Mist |
     | :---: | :---: |
     | <img src="examples/pro-mist-1.png" width="100%"> | <img src="examples/pro-mist-2.png" width="100%"> |
 * **Halation Strength:** Simulates the red/orange glow of bright light bouncing off the back of physical film strips. 
   * <img src="examples/Halation.png" width="100%">
-* **Chromatic Aberration:** Uses sub-pixel sampling to create smooth, infinite-resolution color fringing on the edges of the frame. Keep low (`0.001 - 0.003`) for subtle realism.
+* **Chromatic Aberration:** Uses sub-pixel sampling to create smooth color fringing on the edges of the frame. Keep low (`0.001 - 0.003`) for subtle realism.
   * <img src="examples/chromatic-circular.png" width="100%">
   * <img src="examples/chromatic-circular2.png" width="100%">
 * **Vignette Intensity:** Darkens the corners to mimic a physical lens barrel, subtly guiding the eye to the center.
 
 ### 🎞️ Film Emulation
-* **Grain Power:** Adds analog texture. **Crucially, this is Depth-Aware.** The grain is sharp on the focused subject but gets softer in the blurred background, perfectly matching real-world lens behavior.
+* **Grain Power:** Adds analog texture. **This uses a physical photographic emulsion curve.** Instead of floating uniformly over the image, the grain mathematically reacts to exposure. It peaks heavily in the mid-tones and fades out (via transparency) in pure whites and deep blacks. The noise is also "clumped" using a micro-blur to simulate organic silver halide crystals rather than a sharp digital TV-static grid.
   * <img src="examples/grain.png" width="100%">
 * **Monochrome Grain:** `True` acts like classic Film Stock (luminance noise). `False` acts like a Digital Sensor (RGB color noise).
   * <img src="examples/mono-grain.png" width="100%">
