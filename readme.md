@@ -1,4 +1,6 @@
-*Update 6 March 2026 New functions added. This causes other values to go out-of-whack ... reload node to get back to defaults highly suggested.*
+*Update 6 March 2026 New functions added. If updating, suggested to reload for sensible values.*
+
+*Update 28 April 2026 No code changes - Added Suggested Defaults at the bottom. **Discovery:** Works REALLY great with [ComfyUI Depth Pro](https://github.com/spacepxl/ComfyUI-Depth-Pro)*
 
 # ComfyUI-Optical-Realism
 
@@ -122,3 +124,9 @@ Here is a breakdown of what each parameter does under the hood. *(Note: Some exa
 **"RuntimeError: The size of tensor a (4) must match..."**
 * Your image has an Alpha channel (RGBA) and PyTorch is expecting 3 RGB channels.
 * **Fix:** I've included a helper node called **`Remove Alpha (RGBA to RGB)`**. Slot this right before the Optical Realism node.
+
+## 🤓 Suggested Default Values
+
+* I did not want to hard code these into the script as new suggested defaults, but along with discovering that Apple Depth Pro works great with this node, some minor tweaking left me with these values that I personnaly really enjoy.
+
+<img src="examples/Suggested-Defaults.png" width="25%"> 
