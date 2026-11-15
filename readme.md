@@ -1,7 +1,3 @@
-*Update 6 March 2026 New functions added. If updating, suggested to reload for sensible values.*
-
-*Update 28 April 2026 No code changes - Added Suggested Defaults at the bottom. **Discovery:** Works REALLY great with [ComfyUI Depth Pro](https://github.com/spacepxl/ComfyUI-Depth-Pro)*
-
 # ComfyUI-Optical-Realism
 
 **A post-processing node to bring AI generations closer to physical photography.**
